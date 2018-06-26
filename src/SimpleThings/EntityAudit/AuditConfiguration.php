@@ -24,8 +24,11 @@
 namespace SimpleThings\EntityAudit;
 
 use Doctrine\ORM\Mapping\ClassMetadataInfo;
+use SimpleThings\EntityAudit\Comparator\ComparatorInterface;
 use SimpleThings\EntityAudit\Metadata\Driver\AnnotationDriver;
 use SimpleThings\EntityAudit\Metadata\Driver\DriverInterface;
+use Symfony\Component\DependencyInjection\Argument\RewindableGenerator;
+use Symfony\Component\DependencyInjection\Container;
 
 class AuditConfiguration
 {
@@ -68,6 +71,16 @@ class AuditConfiguration
      * @var callable
      */
     private $usernameCallable;
+
+    /**
+     * @var array
+     */
+    private $comparators;
+
+    public function __construct()
+    {
+        $this->comparators = array();
+    }
 
     /**
      * @param DriverInterface $driver
@@ -202,6 +215,45 @@ class AuditConfiguration
     public function getUsernameCallable()
     {
         return $this->usernameCallable;
+    }
+
+    public function addComparator($comparator)
+    {
+        if (!$comparator instanceof ComparatorInterface) {
+            throw new \InvalidArgumentException('Comparator must be instance of Comparator Interface');
+        }
+
+        $this->comparators[] = $comparator;
+    }
+
+    public function setComparators($comparators, Container $container = null)
+    {
+        if (!$comparators || is_string($comparators)) {
+            return;
+        }
+
+        if ($comparators instanceof RewindableGenerator) {
+            $comparators = iterator_to_array($comparators->getIterator());
+        }
+
+        if (!is_array($comparators) && !($comparators instanceof \Traversable)) {
+            throw new \InvalidArgumentException('Must be Rewindable Generator or array');
+        }
+
+        foreach ($comparators as $comparator) {
+            if (is_string($comparator) && $container) {
+                $comparator = $container->get($comparator);
+            }
+            $this->addComparator($comparator);
+        }
+    }
+
+    /**
+     * @return array|null
+     */
+    public function getComparators()
+    {
+        return $this->comparators;
     }
 
     /**
