@@ -47,6 +47,7 @@ class SimpleThingsEntityAuditExtension extends Extension
             'revision_id_field_type',
             'comparators',
             'global_ignores',
+            'audited_entities',
         );
 
         foreach ($configurables as $key) {

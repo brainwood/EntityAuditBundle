@@ -33,7 +33,19 @@ class Configuration implements ConfigurationInterface
                     ->prototype('scalar')->end()
                     ->defaultValue(array())
                 ->end()
-            ->end()
+                ->arrayNode('audited_entities')
+                    ->canBeUnset()
+                    ->prototype('array')
+                    ->children()
+                        ->arrayNode('ignored_columns')
+                            ->canBeUnset()
+                            ->prototype('scalar')->end()
+                        ->end()
+                        ->booleanNode('enabled')
+                            ->defaultTrue()
+                        ->end()
+                    ->end()
+                ->end()
         ;
 
         return $builder;

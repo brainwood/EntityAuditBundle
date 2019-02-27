@@ -8,6 +8,7 @@ parameters:
   simplethings.entityaudit.revision_id_field_type: ''
   simplethings.entityaudit.comparators: []
   simplethings.entityaudit.global_ignores: []
+  simplethings.entityaudit.audited_entities: []
 
 services:
 
@@ -57,3 +58,4 @@ services:
       - [setMetadataDriver, ['@simplethings_entityaudit.metadriver']]
       - [setComparators, [!tagged simple_things.comparator]]
       - [setComparators, ['%simplethings.entityaudit.comparators%', '@service_container']]
+      - [setAuditedEntities, ['%simplethings.entityaudit.audited_entities%']]

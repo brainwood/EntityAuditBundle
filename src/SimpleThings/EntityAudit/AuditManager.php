@@ -34,7 +34,7 @@ class AuditManager
     {
         $this->entityManager = $entityManager;
         $this->config = $config;
-        $this->metadataFactory = new Metadata\MetadataFactory($this->entityManager, $config->getMetadataDriver());
+        $this->metadataFactory = new Metadata\MetadataFactory($this->entityManager, $config);
     }
 
     public function getMetadataFactory()

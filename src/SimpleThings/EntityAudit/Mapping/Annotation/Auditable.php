@@ -10,4 +10,8 @@ use Doctrine\Common\Annotations\Annotation;
  */
 final class Auditable extends Annotation
 {
+    /**
+     * @var boolean
+     */
+    public $enabled = true;
 }

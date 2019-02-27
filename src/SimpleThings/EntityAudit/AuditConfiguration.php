@@ -77,6 +77,15 @@ class AuditConfiguration
      */
     private $comparators;
 
+    /**
+     * @var array
+     */
+    private $auditedEntities = [];
+
+    /**
+     * AuditConfiguration constructor.
+     */
+
     public function __construct()
     {
         $this->comparators = array();
@@ -273,10 +282,48 @@ class AuditConfiguration
     }
 
     /**
+     * @return array
+     */
+    public function getAuditedEntities(): array
+    {
+        return $this->auditedEntities;
+    }
+
+    /**
+     * @param array $auditedEntities
+     */
+    public function setAuditedEntities(array $auditedEntities): void
+    {
+        $this->auditedEntities = $auditedEntities;
+    }
+
+    /**
      * @return AuditConfiguration
      */
     public static function createWithAnnotationDriver()
     {
         return new self(AnnotationDriver::create());
+    }
+
+
+    /**
+     * Returns true if $entity is audited.
+     *
+     * @param $entity
+     *
+     * @return bool
+     */
+    public function ymlDefinedAudited($className): bool
+    {
+        if (empty($this->auditedEntities)) {
+            return false;
+        }
+
+        return isset($this->auditedEntities[$className]) && $this->auditedEntities[$className]['enabled'];
+    }
+
+    public function getYMLDefinedAuditEntities()
+    {
+        return $this->auditedEntities;
     }
 }

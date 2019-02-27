@@ -25,6 +25,7 @@ namespace SimpleThings\EntityAudit\Metadata\Driver;
 
 use Doctrine\Common\Annotations\AnnotationReader;
 use Doctrine\Common\Annotations\AnnotationRegistry;
+use SimpleThings\EntityAudit\AuditConfiguration;
 use SimpleThings\EntityAudit\Mapping\Annotation\AdditionalIgnore;
 use SimpleThings\EntityAudit\Mapping\Annotation\Auditable;
 use SimpleThings\EntityAudit\Mapping\Annotation\Ignore;
@@ -60,26 +61,34 @@ class AnnotationDriver implements DriverInterface
      * @param  ClassMetadata $classMetadata
      * @return void
      */
-    public function loadMetadataForClass($class, ClassMetadata $classMetadata)
+    public function loadMetadataForClass($class, ClassMetadata $classMetadata, $configDefinedAudits = array())
     {
         $reflection = new \ReflectionClass($class);
 
-        //allow additional ignores to be described.
-        //This can be used for columns that may be inherited or not strictly defined by attribute or ORM mapping
-        $additionalIgnores = $this->reader->getClassAnnotation($reflection,AdditionalIgnore::class);
-
-        if ($additionalIgnores) {
-            foreach ($additionalIgnores->value as $ignore) {
+        if (isset($configDefinedAudits[$class])) {
+            $ignoreFields = $configDefinedAudits[$class]['ignored_columns'];
+            foreach ($ignoreFields as $ignore) {
                 $classMetadata->ignoredFields[$ignore] = true;
             }
-        }
+        } else {
+            //allow additional ignores to be described.
+            //This can be used for columns that may be inherited or not strictly defined by attribute or ORM mapping
+            $additionalIgnores = $this->reader->getClassAnnotation($reflection,AdditionalIgnore::class);
 
-        //Add attributes that are ignored by the Ignore annotation
-        foreach ($reflection->getProperties() as $property) {
-            if ($this->reader->getPropertyAnnotation($property, Ignore::class)) {
-                $classMetadata->ignoredFields[$property->name] = true;
+            if ($additionalIgnores) {
+                foreach ($additionalIgnores->value as $ignore) {
+                    $classMetadata->ignoredFields[$ignore] = true;
+                }
+            }
+
+            //Add attributes that are ignored by the Ignore annotation
+            foreach ($reflection->getProperties() as $property) {
+                if ($this->reader->getPropertyAnnotation($property, Ignore::class)) {
+                    $classMetadata->ignoredFields[$property->name] = true;
+                }
             }
         }
+
 
         //include global ignores
         foreach ($this->globalIgnores as $ignore) {
@@ -106,7 +115,9 @@ class AnnotationDriver implements DriverInterface
     {
         $reflection = new \ReflectionClass($class);
 
-        return (bool) $this->reader->getClassAnnotation($reflection, Auditable::class);
+        $auditedAnnotation = $this->reader->getClassAnnotation($reflection, Auditable::class);
+
+        return (bool) ($auditedAnnotation && $auditedAnnotation->enabled);
     }
 
     /**

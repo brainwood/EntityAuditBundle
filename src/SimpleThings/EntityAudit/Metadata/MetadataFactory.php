@@ -24,6 +24,7 @@
 namespace SimpleThings\EntityAudit\Metadata;
 
 use Doctrine\ORM\EntityManagerInterface;
+use SimpleThings\EntityAudit\AuditConfiguration;
 use SimpleThings\EntityAudit\Metadata\Driver\DriverInterface;
 
 /**
@@ -54,10 +55,11 @@ class MetadataFactory
      * @param EntityManagerInterface $entityManager
      * @param DriverInterface        $driver
      */
-    public function __construct(EntityManagerInterface $entityManager, DriverInterface $driver)
+    public function __construct(EntityManagerInterface $entityManager, AuditConfiguration $config)
     {
         $this->entityManager = $entityManager;
-        $this->driver = $driver;
+        $this->config = $config;
+        $this->driver = $config->getMetadataDriver();
     }
 
     /**
@@ -80,6 +82,15 @@ class MetadataFactory
         $this->load();
 
         return $this->classMetadatas[$class];
+    }
+
+    /**
+     * @param  string        $class
+     * @return array
+     */
+    public function getIgnoredFields($class)
+    {
+        return array_keys($this->classMetadatas[$class]->ignoredFields);
     }
 
     /**
@@ -106,13 +117,13 @@ class MetadataFactory
         foreach ($doctrineClassMetadatas as $doctrineClassMetadata) {
             $class = $doctrineClassMetadata->name;
 
-            if (!$this->driver->isTransient($class)) {
+            if (!$this->driver->isTransient($class) && !$this->config->ymlDefinedAudited($class)) {
                 continue;
             }
 
             $classMetadata = new ClassMetadata($doctrineClassMetadata);
 
-            $this->driver->loadMetadataForClass($class, $classMetadata);
+            $this->driver->loadMetadataForClass($class, $classMetadata, $this->config->getYMLDefinedAuditEntities());
 
             $this->classMetadatas[$class] = $classMetadata;
         }
