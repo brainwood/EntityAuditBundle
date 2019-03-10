@@ -41,6 +41,13 @@ use SimpleThings\EntityAudit\Comparator\ComparatorInterface;
 class LogRevisionsListener implements EventSubscriber
 {
     /**
+     * This listener
+     * 1. creates a revision record and gets the revision id. getRevisionId
+     * 2. Initially inserts records of the current state of the entity. postPersist, postUpdate
+     * 3. goes back and updates the entity with final changes. onFlush, postFlush
+     */
+
+    /**
      * @var \SimpleThings\EntityAudit\AuditConfiguration
      */
     private $config;
@@ -111,6 +118,9 @@ class LogRevisionsListener implements EventSubscriber
      */
     public function postFlush(PostFlushEventArgs $eventArgs)
     {
+        // this function in combination with on flush must calculate changes that take place after the
+        // initial update/insert in order to make sure that the audit is completely up to date with
+        // the final state of the entity.
         $em = $eventArgs->getEntityManager();
         $quoteStrategy = $em->getConfiguration()->getQuoteStrategy();
         $uow = $em->getUnitOfWork();
@@ -132,9 +142,9 @@ class LogRevisionsListener implements EventSubscriber
                 ->update($this->config->getTableName($meta))
                 ->where(sprintf(
                     '%s = %s',
-                    $this->config->getRevisionFieldName(),
+                    $this->config->getRevisionFieldName(), // rev
                     $queryBuilder->createNamedParameter(
-                        $this->getRevisionId(),
+                        $this->getRevisionId(), // id
                         $this->config->getRevisionIdFieldType()
                     )
                 ));
@@ -207,6 +217,8 @@ class LogRevisionsListener implements EventSubscriber
 
             $queryBuilder->execute();
         }
+
+        $this->extraUpdates = array();
     }
 
     public function postPersist(LifecycleEventArgs $eventArgs)
@@ -216,6 +228,13 @@ class LogRevisionsListener implements EventSubscriber
 
         $class = $this->em->getClassMetadata(get_class($entity));
         if (! $this->metadataFactory->isAudited($class->name)) {
+            return;
+        }
+
+        $changeset = $this->calculateSignificantChangeSet($entity, 'INS');
+
+        // if we have no changes left => don't create revision log
+        if (count($changeset) == 0) {
             return;
         }
 
@@ -232,7 +251,7 @@ class LogRevisionsListener implements EventSubscriber
             return;
         }
 
-        $changeset = $changeset = $this->calculateSignificantChangeSet($entity);
+        $changeset = $this->calculateSignificantChangeSet($entity, 'UPD');
 
         // if we have no changes left => don't create revision log
         if (count($changeset) == 0) {
@@ -269,12 +288,26 @@ class LogRevisionsListener implements EventSubscriber
                 continue;
             }
 
+            $changeset = $this->calculateSignificantChangeSet($entity, 'DEL');
+
+            // if we have no changes left => don't create revision log
+            if (count($changeset) == 0) {
+                continue;
+            }
+
             $entityData = array_merge($this->getOriginalEntityData($entity), $this->uow->getEntityIdentifier($entity));
             $this->saveRevisionEntityData($class, $entityData, 'DEL');
         }
 
         foreach ($this->uow->getScheduledEntityInsertions() as $entity) {
             if (! $this->metadataFactory->isAudited(get_class($entity))) {
+                continue;
+            }
+
+            $changeset = $this->calculateSignificantChangeSet($entity, 'INS');
+
+            // if we have no changes left => don't create revision log
+            if (count($changeset) == 0) {
                 continue;
             }
 
@@ -291,7 +324,7 @@ class LogRevisionsListener implements EventSubscriber
             //TODO is calculating revision significance here going to error
             // in the case that there are other event listeners that may change the revision later on?
             // should we be adding to the extraUpdate array in a later event?
-            $changeset = $this->calculateSignificantChangeSet($entity);
+            $changeset = $this->calculateSignificantChangeSet($entity, 'UPD');
 
             // if we have no changes left => don't create revision log
             if (count($changeset) == 0) {
@@ -302,7 +335,7 @@ class LogRevisionsListener implements EventSubscriber
         }
     }
 
-    private function calculateSignificantChangeSet($entity)
+    private function calculateSignificantChangeSet($entity, $revType)
     {
         $class = $this->em->getClassMetadata(get_class($entity));
         if (! $this->metadataFactory->isAudited($class->name)) {
@@ -328,12 +361,17 @@ class LogRevisionsListener implements EventSubscriber
             try {
                 $mapping = $auditMetadata->entity->getFieldMapping($name);
             } catch (\Doctrine\ORM\Mapping\MappingException $e) {
-                continue;
+                try {
+                    $mapping = $auditMetadata->entity->getAssociationMapping($name);
+                } catch (\Doctrine\ORM\Mapping\MappingException $e) {
+                    continue;
+                }
             }
+
             foreach ($comparators as $comparator) {
                 /** @var ComparatorInterface $comparator */
                 // if this comparator is able to weigh in on the decision
-                if ($comparator->canCompare($class, $mapping, $name)) {
+                if ($comparator->canCompare($class, $mapping, $name, $revType)) {
                     if ($comparator->compare($name, $change[1], $change[0])) {
                         continue 2; // change was significant so we can move to next field
                     } else {

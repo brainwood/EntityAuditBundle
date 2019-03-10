@@ -313,7 +313,7 @@ class AuditConfiguration
      *
      * @return bool
      */
-    public function ymlDefinedAudited($className): bool
+    public function ymlDefinedAudited($className)
     {
         if (empty($this->auditedEntities)) {
             return false;

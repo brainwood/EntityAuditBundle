@@ -12,6 +12,10 @@ namespace SimpleThings\EntityAudit\Comparator;
  */
 interface ComparatorInterface
 {
+    //TODO need to update signature to add in event that is triggering compare and make comparators
+    // able to run for each event? Should comparators register what events (delete, insert, update)
+    // they aer able to handle and be gathered in those events? Yes just like Resolvers registering and
+    // being organized
     /**
      * Given the new and old value return a boolean.
      * true if the change warrants a revision
@@ -30,7 +34,8 @@ interface ComparatorInterface
      * @param  ClassMetadata $classMetadata
      * @param  array         $fieldMapping
      * @param  string        $fieldName
+     * @param  string        $revType    INS, UPD, DEL
      * @return boolean
      */
-    public function canCompare($classMetadata, $fieldMapping, $fieldName);
+    public function canCompare($classMetadata, $fieldMapping, $fieldName, $revType);
 }
